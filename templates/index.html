@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Escaneo de Red</title>
+
+<style>
+    body {
+        background-color: #000;
+        color: #00ff00;
+        font-family: "Courier New", monospace;
+        padding: 20px;
+    }
+
+    h1 {
+        text-shadow: 0 0 5px #0f0;
+    }
+
+    input[type="text"] {
+        width: 300px;
+        padding: 8px;
+        background-color: #111;
+        border: 1px solid #00ff00;
+        color: #0f0;
+    }
+
+    button {
+        padding: 8px 15px;
+        background-color: black;
+        border: 1px solid #00ff00;
+        color: #00ff00;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background-color: #00ff00;
+        color: black;
+    }
+
+    /* Barra de progreso */
+    .progress-container {
+        width: 100%;
+        background-color: #222;
+        margin-top: 20px;
+        height: 25px;
+        border: 1px solid #00ff00;
+    }
+
+    .progress-bar {
+        width: 0%;
+        height: 100%;
+        background-color: #00ff00;
+        text-align: center;
+        color: #000;
+        font-weight: bold;
+    }
+
+    table {
+        width: 100%;
+        margin-top: 25px;
+        border-collapse: collapse;
+    }
+    th, td {
+        border: 1px solid #00ff00;
+        padding: 8px;
+    }
+    tr.activo {
+        color: #00ff00;
+    }
+    tr.inactivo {
+        color: gray;
+    }
+</style>
+
+</head>
+<body>
+
+<h1>Escaneo de Red</h1>
+
+<form id="scanForm">
+    Redes a escanear:
+    <input type="text" id="networks" name="networks" value="{{ networks }}">
+    <button type="submit">Iniciar Escaneo</button>
+</form>
+
+<!-- Barra de progreso -->
+<div class="progress-container">
+    <div class="progress-bar" id="progressBar">0%</div>
+</div>
+
+<!-- Tabla de resultados -->
+<table>
+    <tr>
+        <th>#</th>
+        <th>IP</th>
+        <th>Hostname</th>
+        <th>MAC</th>
+        <th>Status</th>
+        <th>Servicios</th> <!-- Nueva columna -->
+        <th>Fabricante</th>
+
+    </tr>
+
+    {% for ip, info in hosts.items() %}
+    <tr class="{{ 'activo' if info['status']=='active' else 'inactivo' }}">
+        <td>{{ loop.index }}</td>
+        <td>{{ ip }}</td>
+        <td>{{ info['hostname'] }}</td>
+        <td>{{ info['mac'] }}</td>
+        <td>{{ info['status'] }}</td>
+        <td>{{ info['services'] }}</td> <!-- Mostrar servicios -->
+        <td>{{ info['fabricante'] }}</td>
+
+    </tr>
+    {% endfor %}
+</table>
+
+
+<script>
+// -------- ENVIAR PETICIÓN PARA INICIAR ESCANEO --------
+document.getElementById("scanForm").onsubmit = function(e) {
+    e.preventDefault();
+// LIMPIAR TABLA AL INICIAR ESCANEO
+const filas = document.querySelectorAll("table tr:not(:first-child)");
+filas.forEach(f => f.remove());
+
+// Reiniciar barra de progreso visualmente
+const bar = document.getElementById("progressBar");
+bar.style.width = "0%";
+bar.textContent = "0%";
+
+
+    const data = new FormData();
+    data.append("networks", document.getElementById("networks").value);
+
+    fetch("/iniciar_escaneo", {
+        method: "POST",
+        body: data
+    });
+
+    verificarProgreso();
+};
+
+// -------- MONITOREAR PROGRESO --------
+function verificarProgreso() {
+    const bar = document.getElementById("progressBar");
+
+    let intervalo = setInterval(() => {
+        fetch("/progreso")
+            .then(r => r.json())
+            .then(data => {
+                bar.style.width = data.progreso + "%";
+                bar.textContent = data.progreso + "%";
+
+                if (!data.escaneando) {
+                    clearInterval(intervalo);
+                    bar.style.width = "100%";
+                    bar.textContent = "100%";
+
+                    // Recargar la página cuando termine
+                    setTimeout(() => {
+                        location.reload();
+                    }, 800);
+                }
+            });
+    }, 300);
+}
+</script>
+
+</body>
+</html>
